@@ -64,10 +64,14 @@ def handle_tcp_message(data, src_ip):
     """Processa mensagens TCP recebidas."""
     
     if data == "hit":
-        print(f"\n[RESPOSTA TCP de {src_ip}]: 🎉 **Seu tiro atingiu!**")
+        confirma_ataque()
+        print(f"\n[RESPOSTA TCP de {src_ip}]: Seu tiro atingiu uma embarcacao")
+        return
+    elif data == "destroyed":
+        confirma_ataque()
+        print(f"\n[RESPOSTA TCP de {src_ip}]:Seu tiro destruiu uma embarcacao!")
         return
     
-    # Lista dos participantes
 
     elif data.startswith("participantes:"):
         try:
@@ -93,9 +97,18 @@ def broadcast_connect():
     s.sendto(BROADCAST_MESSAGE.encode(), ('255.255.255.255', UDP_PORT))
     s.close()
 
-def broadcast_message(message):
+def broadcast_message(msg):
     s = broadcast()
-    s.sendto(message.encode(), ('255.255.255.255', UDP_PORT))
+    if msg.startswith("shot:"):
+        coords_str = msg.split(":", 1)[1]
+        l, c = map(int, coords_str.split(',')) 
+        posicaoValida = marca_ataque(ataque, l, c)
+        if posicaoValida:
+            s.sendto(msg.encode(), ('255.255.255.255', UDP_PORT))
+            print(f"Comando SHOT enviado via BROADCAST.")
+        else: 
+            print(f"Comando SHOT NAO enviado via BROADCAST.")  
+    s.sendto(msg.encode(), ('255.255.255.255', UDP_PORT))
     print(f"Comando SHOT enviado via BROADCAST.")
     s.close()
 
@@ -111,37 +124,55 @@ def handle_udp_message(msg, src_ip):
             debug(f"-> {src_ip} adicionado.")
             print(PARTICIPANTS)
         send_participants(src_ip)
-        
+    
+    
+
     elif msg.startswith("shot:"):
         try:
-            coords_str = msg.split(":", 1)[1]
-            l, c = map(int, coords_str.split(','))
-            shot_coord = (l, c)
-            
-            if shot_coord in BOAT_POSITIONS:
-                BOAT_POSITIONS.remove(shot_coord)
-                send_tcp_message(src_ip, "hit")
-                print(f"\n[TIRO RECEBIDO de {src_ip}]: Posição ({l},{c}). 💥 **HIT!** Resposta TCP enviada.")
+            myIpIndex = PARTICIPANTS.index(MY_IP)
+            atackIPindex = 0
+            if  myIpIndex == 0:
+                atackIPindex = len(PARTICIPANTS) -1 
             else:
-                print(f"\n[TIRO RECEBIDO de {src_ip}]: Posição ({l},{c}). 💧 Miss.")
-                
-            print(f"Posições restantes: {BOAT_POSITIONS}")
+                atackIPindex = PARTICIPANTS.index(MY_IP) - 1
+
+            if src_ip == PARTICIPANTS[atackIPindex]:
+
+                coords_str = msg.split(":", 1)[1]
+                l, c = map(int, coords_str.split(','))                
+                resultado = detona(defesa,l,c)
+
+                if resultado == "hit":
+                    send_tcp_message(src_ip, "hit")
+                    print(f"\n[TIRO RECEBIDO de {src_ip}]: Resposta TCP hit enviada.")
+                if resultado == "destroyed":
+                    if destruidos < 4:
+                        send_tcp_message(src_ip, "destroyed")
+                        print(f"\n[TIRO RECEBIDO de {src_ip}]: Resposta TCP destroyed enviada.")
+                    else:
+                        send_tcp_message(src_ip, "lost")
+                        handle_cli_command("quit")
+                        print(f"\n[TIRO RECEBIDO de {src_ip}]: Jogo perdido.")
+
+                    
             sys.stdout.flush() 
         except Exception:
             debug(f"Erro ao processar tiro de {src_ip}.")
 
     elif msg.startswith("quit"):
         try:
-            print(f"\n[TIRO RECEBIDO de {src_ip}]: Posição ({x},{y}). 💧 Miss.")
-                
-            print(f"Posições restantes: {BOAT_POSITIONS}")
-            sys.stdout.flush() 
-        except Exception:
-            debug(f"Erro ao processar tiro de {src_ip}.")
+            if src_ip in PARTICIPANTS:
+                PARTICIPANTS.remove(src_ip)
+                PARTICIPANTS.sort()
+                debug(f"Participante {src_ip} saiu do jogo.")
+            else:
+                debug(f"Recebi QUIT de IP desconhecido: {src_ip}")
+
+        except Exception as e:
+            debug(f"Erro ao processar QUIT de {src_ip}. Erro: {e}")
             
 
 def send_participants(ip):
-    """Responde com a lista de IPs via TCP (5001)."""
     lst = list(dict.fromkeys(PARTICIPANTS))
     msg = "participantes:" + repr(lst)
     send_tcp_message(ip, msg)

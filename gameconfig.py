@@ -1,6 +1,11 @@
 import random
 import sys
 
+inimigos = 14
+derrubados = 0
+
+destruidos = 0
+
 linhas = 10
 colunas = 10
 embarcacoes = {
@@ -148,25 +153,18 @@ def verifica_insere(grid_defesa, l, c, tamanho, orientacao):
 
 # FUNCOES RECEBER ATAQUE
 
-# Adicionar ao seu gameconfig.py
-
 def detona(grid_defesa, l, c):
+    global destruidos
     local = grid_defesa[l][c] 
     
     if not isinstance(ataque, int) or local == 0:
-        # Se for 'O' ou 'X' (já atingido), não faz nada e retorna miss para simplicidade
-        grid_defesa[l][c] = 'X' # Marca o erro (Miss)
+        grid_defesa[l][c] = 'X' 
         return "miss"
         
-    # 2. Se acertou um navio (marcador > 0)
     
-    # 2.1. Marca o acerto no grid
-    grid_defesa[l][c] = 'X' # Marca o acerto (X)
+    grid_defesa[l][c] = 'X' 
     
-    # 2.2. Verifica se o navio foi destruído
-    tamanho_navio = local # O marcador é o tamanho original do navio (ex: 5)
-    
-    # Verificação em 8 direções (Vertical e Horizontal)
+   
     direcoes = [
         (0, 1), (0, -1),  # Horizontal
         (1, 0), (-1, 0)   # Vertical
@@ -180,12 +178,12 @@ def detona(grid_defesa, l, c):
         nL, nC = l + dL, c + dC
         
         # Percorre o navio nas direções para ver se encontra outra parte intacta (marcador == tamanho_navio)
-        for i in range(1, tamanho_navio): # Checa até o tamanho máximo do navio
+        for i in range(1, local): # Checa até o tamanho máximo do navio
             if 0 <= nL < linhas and 0 <= nC < colunas:
                 parte_adjacente = grid_defesa[nL][nC]
                 
                 # Se encontrar uma parte INTÁCTA do navio (o marcador original)
-                if isinstance(parte_adjacente, int) and parte_adjacente == tamanho_navio:
+                if isinstance(parte_adjacente, int) and parte_adjacente == local:
                     navio_vivo = True
                     break # Encontramos uma parte intacta, navio vivo
                 
@@ -204,7 +202,23 @@ def detona(grid_defesa, l, c):
     if navio_vivo:
         return "hit"
     else:
+        destruidos = destruidos + 1
         return "destroyed"
+
+def marca_ataque(ataque, l, c):
+    if ataque[l][c] != "X":
+        ataque[l][c] = "X"
+        exibir_grid(ataque)
+        return True
+    exibir_grid(ataque)
+    return False
+        
+    
+
+def confirma_ataque():
+    global derrubados
+    derrubados = derrubados + 1
+    
 
 
 
